@@ -1,0 +1,770 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<title>SigV4 Canonical Request Differ</title>
+<meta name="description" content="Paste the canonical request and string to sign from an AWS SignatureDoesNotMatch error next to the ones your code built. The page aligns them line by line and names the documented SigV4 rule each mismatched line breaks. Offline, and it never asks for a secret key.">
+<link rel="canonical" href="https://0xelitesystem.github.io/sigv4-canonical-request-differ/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="SigV4 Canonical Request Differ">
+<meta property="og:description" content="Line up AWS's canonical request from a SignatureDoesNotMatch error against the one your signer built, and see which documented SigV4 rule each differing line breaks. No secret key, no network.">
+<meta property="og:url" content="https://0xelitesystem.github.io/sigv4-canonical-request-differ/">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"SigV4 Canonical Request Differ","applicationCategory":"DeveloperApplication","operatingSystem":"Any (browser)","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"url":"https://0xelitesystem.github.io/sigv4-canonical-request-differ/","author":{"@type":"Person","name":"0xelitesystem","url":"https://elitesystem.ai"}}
+</script>
+<script>
+/* Apply a stored theme before first paint. */
+(function () {
+  try {
+    var t = localStorage.getItem("theme");
+    if (t === "dark" || t === "light") { document.documentElement.setAttribute("data-theme", t); }
+  } catch (e) {}
+})();
+</script>
+<style>
+/* Palette verified by math (WCAG relative luminance), every text token against
+   every surface token, both themes. --muted is a border token only and is never
+   used as a text colour.
+
+   LIGHT, on --bg #e8ebef / --panel #ffffff / --code #dcdfe4
+     --ink #0a0a0a 16.56 19.80 14.82   --ink-soft #3d444d 8.24 9.85 7.37
+     --accent #2d6b00 5.46 6.53 4.89   --ok #1a6127 6.31 7.55 5.65
+     --warn #8a4d00 5.59 6.68 5.00     --err #8f1d0c 7.48 8.94 6.69
+     --info #0f4f7a 7.26 8.68 6.50     button text #ffffff on --accent 6.53
+   DARK, on --bg #0a0a0a / --panel #141414 / --code #1c1c1c
+     --ink #e8ebef 16.56 15.41 14.25   --ink-soft #b9c0c9 10.79 10.04 9.29
+     --accent #d4ff3a 17.12 15.94 14.74 --ok #7ee08a 12.18 11.33 10.48
+     --warn #f0c674 12.29 11.44 10.58  --err #ff9b8a 9.72 9.04 8.36
+     --info #8fd3ff 12.19 11.34 10.49  button text #0a0a0a on --accent 17.12 */
+:root {
+  color-scheme: light;
+  --bg: #e8ebef; --panel: #ffffff; --code: #dcdfe4;
+  --ink: #0a0a0a; --ink-soft: #3d444d; --accent: #2d6b00; --on-accent: #ffffff;
+  --ok: #1a6127; --warn: #8a4d00; --err: #8f1d0c; --info: #0f4f7a;
+  --muted: #5b636e;
+  --mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0a0a0a; --panel: #141414; --code: #1c1c1c;
+    --ink: #e8ebef; --ink-soft: #b9c0c9; --accent: #d4ff3a; --on-accent: #0a0a0a;
+    --ok: #7ee08a; --warn: #f0c674; --err: #ff9b8a; --info: #8fd3ff;
+    --muted: #8f98a3;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0a0a0a; --panel: #141414; --code: #1c1c1c;
+  --ink: #e8ebef; --ink-soft: #b9c0c9; --accent: #d4ff3a; --on-accent: #0a0a0a;
+  --ok: #7ee08a; --warn: #f0c674; --err: #ff9b8a; --info: #8fd3ff;
+  --muted: #8f98a3;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0; padding: 0 1rem 4rem; background: var(--bg); color: var(--ink); font: 16px/1.55 var(--sans); }
+.wrap { max-width: 76rem; margin: 0 auto; }
+header.top { display: flex; gap: 1rem; justify-content: space-between; align-items: flex-start; padding: 2rem 0 1rem; border-bottom: 1px solid var(--muted); }
+h1 { font-size: 1.7rem; line-height: 1.2; margin: 0 0 .35rem; }
+h2 { font-size: 1.25rem; margin: 2.2rem 0 .6rem; }
+h3 { font-size: 1.05rem; margin: 1.3rem 0 .4rem; }
+p { margin: .6rem 0; }
+.lede { color: var(--ink-soft); margin: 0; max-width: 54rem; }
+.note { color: var(--ink-soft); font-size: .93rem; }
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible, summary:focus-visible, pre:focus-visible {
+  outline: 3px solid var(--accent); outline-offset: 2px;
+}
+code, kbd, pre { font-family: var(--mono); font-size: .88rem; }
+.panel { background: var(--panel); border: 1px solid var(--muted); border-radius: 6px; padding: 1rem; margin: 1rem 0; }
+.grid { display: grid; gap: 1rem; grid-template-columns: 1fr; }
+@media (min-width: 60rem) { .grid.two { grid-template-columns: 1fr 1fr; } }
+label { display: block; font-weight: 600; margin: .8rem 0 .25rem; }
+label .hint, .hint { font-weight: 400; color: var(--ink-soft); font-size: .88rem; }
+textarea, select {
+  width: 100%; font-family: var(--mono); font-size: .88rem; color: var(--ink);
+  background: var(--code); border: 1px solid var(--muted); border-radius: 4px; padding: .5rem .6rem;
+}
+textarea { min-height: 14rem; resize: vertical; line-height: 1.45; white-space: pre; overflow-x: auto; }
+button {
+  font: inherit; font-size: .95rem; cursor: pointer; border-radius: 4px; padding: .45rem .8rem;
+  background: var(--code); color: var(--ink); border: 1px solid var(--muted);
+}
+button.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
+button:hover { border-color: var(--accent); }
+.examples { display: flex; flex-wrap: wrap; gap: .5rem; margin: .5rem 0 0; }
+.tag { display: inline-block; font-family: var(--mono); font-size: .8rem; font-weight: 700; padding: .05rem .45rem; border: 1px solid currentColor; border-radius: 3px; margin-right: .4rem; }
+.t-ok { color: var(--ok); } .t-err { color: var(--err); } .t-warn { color: var(--warn); } .t-info { color: var(--info); }
+.diff { border: 1px solid var(--muted); border-radius: 6px; background: var(--panel); margin: .8rem 0; }
+.drow { display: grid; grid-template-columns: 1fr; gap: .4rem; padding: .55rem .7rem; border-top: 1px solid var(--muted); }
+.drow:first-child { border-top: 0; }
+@media (min-width: 40rem) { .drow { grid-template-columns: 10rem minmax(0, 1fr) minmax(0, 1fr); } .drow .rules { grid-column: 1 / -1; } }
+.drow.bad { border-left: 5px solid var(--err); }
+.drow.warnrow { border-left: 5px solid var(--warn); }
+.drow .part { font-weight: 700; font-size: .9rem; }
+.drow .side { min-width: 0; }
+.drow .side .lab { display: block; font-size: .78rem; font-weight: 700; color: var(--ink-soft); }
+.drow pre { margin: 0; background: var(--code); color: var(--ink); border-radius: 4px; padding: .35rem .5rem; overflow-x: auto; white-space: pre; }
+.drow .rules { font-size: .9rem; }
+.drow .rules p { margin: .25rem 0; }
+.summary { border-left: 6px solid var(--muted); padding: .6rem .9rem; margin: .8rem 0; background: var(--panel); border-radius: 0 4px 4px 0; }
+.summary.pass { border-left-color: var(--ok); } .summary.fail { border-left-color: var(--err); } .summary.split { border-left-color: var(--warn); }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+th, td { text-align: left; vertical-align: top; padding: .35rem .5rem; border-bottom: 1px solid var(--muted); }
+td code { word-break: break-all; }
+caption { text-align: left; font-weight: 600; padding: .3rem 0; }
+.tablewrap { overflow-x: auto; }
+ul.tight { margin: .3rem 0; padding-left: 1.3rem; }
+ul.tight li { margin: .15rem 0; }
+.err-box { border: 1px solid var(--err); color: var(--err); background: var(--panel); border-radius: 4px; padding: .5rem .7rem; margin: .5rem 0; }
+footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--muted); color: var(--ink-soft); font-size: .9rem; }
+.row { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
+dl.rules dt { font-family: var(--mono); font-weight: 700; margin-top: .6rem; }
+dl.rules dd { margin: .1rem 0 0 1.2rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div>
+    <h1>SigV4 Canonical Request Differ</h1>
+    <p class="lede">Paste the canonical request and string to sign that AWS returned with a SignatureDoesNotMatch error, next to the ones your code built. The page splits both into their parts, lines them up (headers by name, not position), and names the documented Signature Version 4 rule each differing line breaks. It never asks for a secret key: it only hashes the canonical requests you paste, to check them against the strings to sign.</p>
+  </div>
+  <button type="button" id="theme-toggle" aria-label="Switch to dark theme">Dark</button>
+</header>
+
+<main>
+<section aria-labelledby="h-input">
+<h2 id="h-input">1. The two sides</h2>
+<p class="note">AWS's IAM troubleshooting guide says: "Compare the canonical request and string to your signed request with the value in the error message. Modify the signing process if there are any differences." Load an example or paste your own. Nothing leaves this page; still, consider redacting access key IDs before pasting anything anywhere.</p>
+<div class="examples" id="examples" role="group" aria-label="Load an example"></div>
+<div class="grid two">
+  <div class="panel">
+    <label for="in-aws">AWS said <span class="hint">an S3 style XML error body, the "The canonical string for this request should have been" message, or a bare canonical request</span></label>
+    <textarea id="in-aws" spellcheck="false" autocomplete="off" wrap="off"></textarea>
+  </div>
+  <div class="panel">
+    <label for="in-mine">Your code built <span class="hint">the canonical request, optionally followed by the string to sign</span></label>
+    <textarea id="in-mine" spellcheck="false" autocomplete="off" wrap="off"></textarea>
+  </div>
+</div>
+<div class="row">
+  <label for="in-service" style="margin:0">Service</label>
+  <select id="in-service" style="width:auto">
+    <option value="s3">s3</option>
+    <option value="s3express">s3express</option>
+    <option value="other">other (any non-S3 service)</option>
+  </select>
+  <button type="button" class="primary" id="btn-run">Compare</button>
+  <span class="hint">The service decides which path encoding is expected. Results also update as you type.</span>
+</div>
+</section>
+
+<section aria-labelledby="h-out">
+<h2 id="h-out">2. Line by line</h2>
+<div id="out" aria-live="polite"></div>
+</section>
+
+<section aria-labelledby="h-rules">
+<h2 id="h-rules">3. The rule catalogue</h2>
+<div class="panel">
+<p class="note">Rules K1 to K11 and K13 to K15 come from the IAM User Guide page "Create a signed AWS API request" and its troubleshooting page. K12 comes from the documentation in the AWS SDK for JavaScript signer (smithy-typescript, SignatureV4Base.ts), not from AWS service documentation. Anything that matches no rule is reported as "differs; no catalogued rule matched", never as a guess.</p>
+<dl class="rules">
+  <dt>K1</dt><dd>"The space character is a reserved character and must be encoded as "%20" (and not as "+")."</dd>
+  <dt>K2</dt><dd>"Letters in the hexadecimal value must be uppercase, for example "%1A"."</dd>
+  <dt>K3</dt><dd>An unreserved character (A to Z, a to z, 0 to 9, hyphen, period, underscore, tilde) was percent-encoded, or a reserved one was left raw.</dd>
+  <dt>K4</dt><dd>"You must also sort the parameters in the canonical query string alphabetically by key name. The sorting occurs after encoding." Mixed case keys are compared by byte value here.</dd>
+  <dt>K5</dt><dd>A parameter without a value still needs its "=": the IAM page's example for ?acl is UriEncode("acl") + "=" + "".</dd>
+  <dt>K6</dt><dd>Header names must be lowercase and the headers sorted by name.</dd>
+  <dt>K7</dt><dd>Header values: "trim any leading or trailing spaces. convert sequential spaces to a single space."</dd>
+  <dt>K8</dt><dd>"separate the values for a multi-value header using commas."</dd>
+  <dt>K9</dt><dd>The SignedHeaders line must list exactly the canonical header names, and both sides must sign the same set.</dd>
+  <dt>K10</dt><dd>A signed header has a value on one side and is empty on the other: the header arrived empty or different, so something between the client and AWS changed it. The troubleshooting page: "You can also verify that you didn't send the request through a proxy that modifies the headers or the request."</dd>
+  <dt>K11</dt><dd>"If there is no payload in the request, you compute a hash of the empty string", which is e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855. "For Amazon S3, include the literal string UNSIGNED-PAYLOAD when constructing a canonical request, and set the same value as the x-amz-content-sha256 header value when sending the request."</dd>
+  <dt>K12</dt><dd>Path encoded once on one side and twice on the other (%25XX against %XX), or normalized on one side only. The SDK signer documents path escaping as "required for every AWS service, except Amazon S3, as of late 2017", says "Non-S3 services, we normalize the path and then double URI encode it.", and for S3 that "we shouldn't normalize the path".</dd>
+  <dt>K13</dt><dd>"Encode the forward slash character, '/', everywhere except in the object key name."</dd>
+  <dt>K14</dt><dd>A volatile header was signed. The IAM page lists headers not to sign, "including connection , x-amzn-trace-id , user-agent , keep-alive , transfer-encoding , TE , trailer , upgrade , proxy-authorization , and proxy-authenticate". A warning, not an error.</dd>
+  <dt>K15</dt><dd>A required header is not signed: "You must include the host header (HTTP/1.1) or the :authority header (HTTP/2), and any x-amz-* headers in the signature." and "The x-amz-content-sha256 header is required for Amazon S3 AWS requests."</dd>
+  <dt>K16</dt><dd>The last line of a string to sign must be the SHA-256 hex of that side's canonical request. A mismatch on your side means your signer hashed something other than what you pasted.</dd>
+</dl>
+<p class="note">S3 error bodies commonly include CanonicalRequest and StringToSign elements; not every AWS service returns the canonical request. SigV4a (AWS4-ECDSA-P256-SHA256) is recognised, but its credential scope rule differs and it is not checked. This is an independent tool, not affiliated with or endorsed by Amazon Web Services.</p>
+</div>
+</section>
+
+<section aria-labelledby="h-self">
+<h2 id="h-self">4. Self test</h2>
+<p class="note">One fixture per rule K1 to K16, the eight presets, the empty-string hash recomputed live with WebCrypto, and a fuzz test: random canonical requests from a fixed seed, each mutated by exactly one catalogued rule, where the differ must name that rule. The last row is a positive control written to fail; if it ever holds, the suite is not really running.</p>
+<p id="self-summary">Running...</p>
+<button type="button" id="btn-self">Run the self test again</button>
+<div class="tablewrap" id="self"></div>
+</section>
+</main>
+
+<footer>
+  <p>MIT licensed. Single file, no network calls, no storage beyond your theme choice. Source: <a href="https://github.com/0xelitesystem/sigv4-canonical-request-differ">github.com/0xelitesystem/sigv4-canonical-request-differ</a>. Built by <a href="https://elitesystem.ai">elitesystem.ai</a>.</p>
+</footer>
+</div>
+
+<script>
+(function () {
+"use strict";
+
+/* ENGINE START */
+var ENGINE = (function () {
+var EMPTY = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+var VOLATILE = ["connection", "x-amzn-trace-id", "user-agent", "keep-alive", "transfer-encoding", "te", "trailer", "upgrade", "proxy-authorization", "proxy-authenticate"];
+var ALG = /^AWS4-(HMAC-SHA256|ECDSA-P256-SHA256)$/;
+
+function decodeEntities(s) {
+  var n = 0;
+  var out = s.replace(/&(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);/g, function (m, g) {
+    n++;
+    if (g === "amp") { return "&"; } if (g === "lt") { return "<"; } if (g === "gt") { return ">"; } if (g === "quot") { return '"'; } if (g === "apos") { return "'"; }
+    var cp = g[1] === "x" ? parseInt(g.slice(2), 16) : parseInt(g.slice(1), 10);
+    try { return String.fromCodePoint(cp); } catch (e) { return m; }
+  });
+  return { text: out, count: n };
+}
+function splitCrSts(text) {
+  /* canonical request, optionally followed by a string to sign */
+  var lines = text.split("\n"), idx = -1;
+  for (var i = 1; i < lines.length; i++) { if (ALG.test(lines[i].trim()) && (lines[i - 1] === "" || /^[0-9a-f]{64}$|UNSIGNED-PAYLOAD|^STREAMING-/.test(lines[i - 1].trim()))) { idx = i; break; } }
+  if (idx < 0) { return { cr: text, sts: null }; }
+  var cr = lines.slice(0, idx).join("\n").replace(/\n+$/, "");
+  return { cr: cr, sts: lines.slice(idx).join("\n").replace(/\n+$/, "") };
+}
+function normalize(raw, notes, who) {
+  var t = String(raw);
+  if (/\r/.test(t)) { t = t.replace(/\r\n?/g, "\n"); notes.push(who + ": CRLF line endings were converted to LF."); }
+  if (/^\n+/.test(t)) { t = t.replace(/^\n+/, ""); }
+  if (/\n+$/.test(t)) { t = t.replace(/\n+$/, ""); notes.push(who + ": the trailing newline was removed; the canonical request ends with the payload hash line."); }
+  return t;
+}
+function parseAws(raw) {
+  var notes = [], fmt = "bare", cr = null, sts = null, t = String(raw);
+  if (/<CanonicalRequest>/.test(t)) {
+    fmt = "S3 style XML error body";
+    var m1 = t.match(/<CanonicalRequest>([\s\S]*?)<\/CanonicalRequest>/), m2 = t.match(/<StringToSign>([\s\S]*?)<\/StringToSign>/);
+    if (m1) { var d1 = decodeEntities(m1[1]); cr = d1.text; if (d1.count) { notes.push("AWS side: " + d1.count + " XML entit" + (d1.count === 1 ? "y was" : "ies were") + " decoded in CanonicalRequest (for example &amp;amp; to &amp;)."); } }
+    if (m2) { sts = decodeEntities(m2[1]).text; }
+    if (/<Code>\s*SignatureDoesNotMatch\s*<\/Code>/.test(t)) { notes.push("AWS side: the error code is SignatureDoesNotMatch."); }
+  } else if (/canonical string for this request should have been/i.test(t)) {
+    fmt = "\"should have been\" message";
+    var dd = decodeEntities(t); if (dd.count) { notes.push("AWS side: " + dd.count + " XML entities were decoded."); }
+    /* The canonical request can itself hold a ' (a header value such as it's), so read up to the quote that
+       comes right before "The String-to-Sign should have been", or up to the last quote when that part is absent. */
+    var m = dd.text.match(/canonical string for this request should have been\s*'([\s\S]*)'\s*The String-to-Sign should have been\s*'([\s\S]*?)'/i)
+      || dd.text.match(/canonical string for this request should have been\s*'([\s\S]*)'/i);
+    if (m) { cr = m[1]; sts = m[2] || null; }
+  } else {
+    var sp = splitCrSts(t); cr = sp.cr; sts = sp.sts;
+  }
+  if (cr === null) { return { error: "Could not find a canonical request in the AWS side." }; }
+  cr = normalize(cr, notes, "AWS side");
+  if (sts !== null) { sts = normalize(sts, notes, "AWS side string to sign"); }
+  return { fmt: fmt, cr: cr, sts: sts, notes: notes };
+}
+function parseMine(raw) {
+  var notes = [], t = String(raw).replace(/\r\n?/g, function () { return "\n"; });
+  if (/\r/.test(String(raw))) { notes.push("Your side: CRLF line endings were converted to LF."); }
+  var sp = splitCrSts(t.replace(/^\n+/, ""));
+  return { fmt: "canonical request", cr: normalize(sp.cr, notes, "Your side"), sts: sp.sts === null ? null : normalize(sp.sts, notes, "Your side string to sign"), notes: notes };
+}
+var HDR_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+:/;
+function splitCanonical(cr) {
+  var lines = cr.split("\n"), issues = [];
+  if (lines.length < 6) { return { error: "A canonical request has at least six lines (method, URI, query, at least one header, a blank line, SignedHeaders, payload hash); this one has " + lines.length + "." }; }
+  var q = lines[2];
+  if (HDR_NAME.test(q) && q.indexOf("=") < 0 || (HDR_NAME.test(q) && q.indexOf("=") > q.indexOf(":"))) {
+    issues.push("Line 3 looks like a header, not a query string. An empty query must still be present as an empty line; it is treated as missing here.");
+    lines.splice(2, 0, "");
+  }
+  var n = lines.length;
+  if (lines[n - 3] !== "") { return { error: "Expected a blank line before the SignedHeaders line (the line before last). Found: " + JSON.stringify(lines[n - 3]).slice(0, 80) }; }
+  var headers = lines.slice(3, n - 3).map(function (l, i) {
+    var c = l.indexOf(":");
+    if (c < 0) { issues.push("Header line " + (i + 1) + " has no colon: " + l.slice(0, 80)); return { raw: l, name: l, lname: l.toLowerCase(), value: "" }; }
+    return { raw: l, name: l.slice(0, c), lname: l.slice(0, c).toLowerCase(), value: l.slice(c + 1) };
+  });
+  if (!headers.length) { issues.push("There are no canonical header lines."); }
+  return { method: lines[0], uri: lines[1], query: lines[2], headers: headers, signed: lines[n - 2], payload: lines[n - 1], issues: issues };
+}
+function splitSts(sts) {
+  var l = sts.split("\n");
+  return { alg: l[0] || "", date: l[1] || "", scope: l[2] || "", hash: l[3] || "", extra: l.length > 4, sigv4a: /ECDSA/.test(l[0] || "") };
+}
+
+/* ---------- encoding helpers ---------- */
+function pctDecode(s) {
+  try { return decodeURIComponent(s.replace(/\+/g, "%2B")); } catch (e) { return null; }
+}
+function hasLowerHex(s) { return /%[0-9A-Fa-f]{2}/.test(s) && /%(?:[0-9A-F][a-f]|[a-f][0-9A-Fa-f])/.test(s); }
+function upperHex(s) { return s.replace(/%([0-9A-Fa-f]{2})/g, function (m, h) { return "%" + h.toUpperCase(); }); }
+function encodingRules(a, b, ctx) {
+  /* a is AWS's text, b is yours, both differing; returns rule hits */
+  var hits = [];
+  if (a.replace(/%20/g, "+") === b.replace(/%20/g, "+") && (/\+/.test(a) || /\+/.test(b))) {
+    var who = /\+/.test(b) && /%20/.test(a) ? "your side" : "the AWS side";
+    hits.push({ k: "K1", t: "A space is encoded as + on " + who + "; it must be %20." });
+  }
+  if (upperHex(a) === upperHex(b) && a !== b) {
+    hits.push({ k: "K2", t: "Percent escapes use lowercase hex on " + (hasLowerHex(b) ? "your side" : "the AWS side") + "; the letters must be uppercase." });
+  }
+  return hits;
+}
+function unreservedOrReserved(a, b) {
+  var da = pctDecode(a), db = pctDecode(b);
+  if (da === null || db === null || da !== db) { return null; }
+  var esc = /%(4[1-9A-F]|5[0-9A]|6[1-9A-F]|7[0-9A]|3[0-9]|2D|2E|5F|7E)/i;
+  var side = esc.test(b) && !esc.test(a) ? "your side" : esc.test(a) && !esc.test(b) ? "the AWS side" : null;
+  if (side) { return { k: "K3", t: "An unreserved character is percent-encoded on " + side + "; A to Z, a to z, 0 to 9, hyphen, period, underscore and tilde are never encoded." }; }
+  return { k: "K3", t: "The two sides decode to the same text but encode it differently: a reserved character is left raw on one side." };
+}
+
+/* ---------- comparison ---------- */
+function cmpBytes(x, y) { return x < y ? -1 : x > y ? 1 : 0; }
+function parseQuery(q) {
+  if (q === "") { return []; }
+  return q.split("&").map(function (p) { var e = p.indexOf("="); return e < 0 ? { k: p, v: null, raw: p } : { k: p.slice(0, e), v: p.slice(e + 1), raw: p }; });
+}
+function sortedBy(list) { for (var i = 1; i < list.length; i++) { if (cmpBytes(list[i - 1], list[i]) > 0) { return false; } } return true; }
+function pathRules(a, b, svc) {
+  var hits = [];
+  var dec = function (s) { return s.replace(/%25([0-9A-Fa-f]{2})/g, "%$1"); };
+  var s3 = svc === "s3" || svc === "s3express";
+  if (dec(b) === a && b !== a || dec(a) === b && a !== b) {
+    var twiceMine = dec(b) === a;
+    var t = "The path is encoded " + (twiceMine ? "twice on your side and once on the AWS side" : "once on your side and twice on the AWS side") + ". ";
+    if (s3) { t += "For " + svc + " the path is encoded once and not normalized; the SDK signer documents the double encoding as the rule for every service except Amazon S3." + (svc === "s3express" ? " Receipt: curl/curl#23120, \"aws-sigv4: S3 Express (s3express) paths get encoded twice\"." : ""); }
+    else { t += "Outside S3 the SDK signer documents: \"Non-S3 services, we normalize the path and then double URI encode it.\""; }
+    hits.push({ k: "K12", t: t });
+    return hits;
+  }
+  var norm = function (p) { var segs = [], parts = p.split("/"); parts.forEach(function (x) { if (x === "" || x === ".") { return; } if (x === "..") { segs.pop(); } else { segs.push(x); } }); return (p[0] === "/" ? "/" : "") + segs.join("/") + (segs.length && p.slice(-1) === "/" ? "/" : ""); };
+  if (norm(a) === norm(b) && (norm(a) === a || norm(b) === b)) {
+    hits.push({ k: "K12", t: "One side normalized the path (dot segments or repeated slashes) and the other did not. The SDK signer normalizes for non-S3 services and, for S3, says \"we shouldn't normalize the path\"." });
+    return hits;
+  }
+  if (a.replace(/%2F/gi, "/") === b.replace(/%2F/gi, "/")) {
+    hits.push({ k: "K13", t: "A slash is encoded as %2F on " + (/%2F/i.test(b) ? "your side" : "the AWS side") + ". \"Encode the forward slash character, '/', everywhere except in the object key name.\"" });
+    return hits;
+  }
+  hits = encodingRules(a, b);
+  if (!hits.length) { var u = unreservedOrReserved(a, b); if (u) { hits.push(u); } }
+  return hits;
+}
+function queryRules(a, b) {
+  var hits = [], A = parseQuery(a), B = parseQuery(b);
+  var key = function (p) { return p.k + "=" + (p.v === null ? "" : p.v); };
+  var ka = A.map(key), kb = B.map(key);
+  if (A.some(function (p) { return p.v === null; }) || B.some(function (p) { return p.v === null; })) {
+    if (ka.slice().sort().join("&") === kb.slice().sort().join("&")) {
+      var nm = (B.filter(function (p) { return p.v === null; })[0] || A.filter(function (p) { return p.v === null; })[0]).k;
+      hits.push({ k: "K5", t: "The parameter " + nm + " has no '=' on " + (B.some(function (p) { return p.v === null; }) ? "your side" : "the AWS side") + ". A valueless parameter is written as " + nm + "= in the canonical query string." });
+    }
+  }
+  if (ka.length === kb.length && ka.slice().sort(cmpBytes).join("&") === kb.slice().sort(cmpBytes).join("&") && ka.join("&") !== kb.join("&")) {
+    var keysB = B.map(function (p) { return p.k; }), keysA = A.map(function (p) { return p.k; });
+    var t = sortedBy(keysB) && sortedBy(keysA)
+      ? "The same parameters appear in a different order. Both sides are sorted by key, so the difference is the order of a repeated key's values."
+      : "The same parameters appear in a different order. Your side is " + (sortedBy(keysB) ? "" : "not ") + "sorted by key; the AWS side is " + (sortedBy(keysA) ? "" : "not ") + "sorted.";
+    if ((keysA.concat(keysB)).some(function (k) { return /[A-Z]/.test(k); }) && (keysA.concat(keysB)).some(function (k) { return /[a-z]/.test(k); })) { t += " Keys mix upper and lower case: the IAM page says alphabetically; this page compares byte values, which puts uppercase first."; }
+    hits.push({ k: "K4", t: t });
+  }
+  [["your side", B], ["the AWS side", A]].forEach(function (s) { if (s[1].some(function (p) { return p.k.toLowerCase() === "x-amz-signature"; })) { hits.push({ k: "presigned", t: "X-Amz-Signature is in the canonical query string on " + s[0] + ". In a presigned URL every other X-Amz-* parameter is signed, but the signature itself must not be part of the canonical query." }); } });
+  if (!hits.length) {
+    hits = encodingRules(a, b);
+    if (!hits.length) { var u = unreservedOrReserved(a, b); if (u) { hits.push(u); } }
+  }
+  return hits;
+}
+function collapse(v) { return v.trim().replace(/ {2,}/g, " "); }
+function headerValueRules(name, a, b, signedA, signedB) {
+  var hits = [];
+  if ((a === "") !== (b === "")) {
+    if (a === "") { hits.push({ k: "K10", t: "The header " + name + " has a value on your side and is empty in AWS's canonical request: the header arrived empty or different, so something between the client and AWS changed it. \"You can also verify that you didn't send the request through a proxy that modifies the headers or the request.\"" }); }
+    else { hits.push({ k: "K10", t: "The header " + name + " is empty on your side but has a value in AWS's canonical request: your signer read the header before it was set, or something added it on the way." }); }
+    return hits;
+  }
+  if (collapse(a) === collapse(b)) { hits.push({ k: "K7", t: "The values match once trimmed and with runs of spaces collapsed; " + (collapse(b) !== b ? "your side" : "the AWS side") + " did not normalize. The IAM page: trim any leading or trailing spaces and convert sequential spaces to a single space." }); return hits; }
+  var toks = function (v) { return v.split(/\s*,\s*|\s+/).filter(Boolean).join("\u0000"); };
+  if (toks(a) === toks(b)) { hits.push({ k: "K8", t: "The same values are joined differently (" + JSON.stringify(b) + " on your side, " + JSON.stringify(a) + " from AWS). The IAM page: separate the values for a multi-value header using commas. Receipt: anthropics/anthropic-sdk-csharp#268, where the signer used a space \"while HttpClient put anthropic-beta: beta-one, beta-two on the wire and the service recomputed from that.\"" }); return hits; }
+  return hits;
+}
+function sideChecks(P, who, svc) {
+  var out = [];
+  var names = P.headers.map(function (h) { return h.name; });
+  var lnames = P.headers.map(function (h) { return h.lname; });
+  P.headers.forEach(function (h) { if (h.name !== h.lname) { out.push({ k: "K6", t: who + ": the header name " + h.name + " is not lowercase." }); } });
+  if (!sortedBy(lnames)) { out.push({ k: "K6", t: who + ": the canonical headers are not sorted by name." }); }
+  lnames.filter(function (x, i) { return lnames.indexOf(x) !== i; }).filter(function (x, i, arr) { return arr.indexOf(x) === i; }).forEach(function (d) {
+    out.push({ k: "K8", t: who + ": " + d + " is on more than one canonical header line. A multi-value header is one line; the IAM page: separate the values for a multi-value header using commas." });
+  });
+  var signed = P.signed.split(";");
+  if (P.signed !== P.signed.toLowerCase()) { out.push({ k: "K6", t: who + ": SignedHeaders contains uppercase letters." }); }
+  if (signed.join(";").toLowerCase() !== lnames.join(";")) { out.push({ k: "K9", t: who + ": SignedHeaders (" + P.signed + ") does not list exactly the canonical header names in order (" + lnames.join(";") + ")." }); }
+  signed.map(function (s) { return s.toLowerCase(); }).forEach(function (s) { if (VOLATILE.indexOf(s) >= 0) { out.push({ k: "K14", t: who + ": " + s + " is signed. The IAM page lists it among headers not to sign; a hop can change it. Warning only.", warn: true }); } });
+  var ls = signed.map(function (s) { return s.toLowerCase(); });
+  if (ls.indexOf("host") < 0 && ls.indexOf(":authority") < 0) { out.push({ k: "K15", t: who + ": host (or :authority) is not signed." }); }
+  if ((svc === "s3" || svc === "s3express") && ls.indexOf("x-amz-content-sha256") < 0) { out.push({ k: "K15", t: who + ": x-amz-content-sha256 is not signed, which S3 requires." }); }
+  P.headers.forEach(function (h) { if (/^x-amz-/.test(h.lname) && ls.indexOf(h.lname) < 0) { out.push({ k: "K15", t: who + ": " + h.lname + " is present but not signed." }); } });
+  return out;
+}
+function diff(awsRaw, mineRaw, svc) {
+  var res = { rows: [], notes: [], stsRows: [], first: null, errors: [] };
+  if (!String(awsRaw).trim() || !String(mineRaw).trim()) { res.errors.push("Paste both sides to compare."); return res; }
+  var A = parseAws(awsRaw), M = parseMine(mineRaw);
+  if (A.error) { res.errors.push(A.error); return res; }
+  res.notes = res.notes.concat(["AWS side read as: " + A.fmt + "."], A.notes, M.notes);
+  if (/(AKIA|ASIA)[0-9A-Z]{16}/.test(awsRaw + mineRaw)) { res.notes.push("The paste contains what looks like an access key ID. It stays in this page, but redact it before sharing the text anywhere."); }
+  var PA = splitCanonical(A.cr), PM = splitCanonical(M.cr);
+  if (PA.error) { res.errors.push("AWS side: " + PA.error); }
+  if (PM.error) { res.errors.push("Your side: " + PM.error); }
+  if (PA.error || PM.error) { return res; }
+  PA.issues.forEach(function (x) { res.notes.push("AWS side: " + x); });
+  PM.issues.forEach(function (x) { res.notes.push("Your side: " + x); });
+  res.A = A; res.M = M; res.PA = PA; res.PM = PM;
+  /* string to sign first */
+  var SA = A.sts ? splitSts(A.sts) : null, SM = M.sts ? splitSts(M.sts) : null;
+  res.SA = SA; res.SM = SM;
+  if (SA && SM) {
+    [["Algorithm", "alg"], ["RequestDateTime", "date"], ["CredentialScope", "scope"]].forEach(function (p) {
+      var same = SA[p[1]] === SM[p[1]], rules = [];
+      if (!same) { rules.push({ k: "scope", t: p[0] === "Algorithm" ? "The algorithms differ, so these are different signing schemes." : "A different " + p[0] + " means a different request, not an encoding bug: fix the date, region or service your signer uses before reading the rows below." }); }
+      res.stsRows.push({ part: p[0], a: SA[p[1]], m: SM[p[1]], same: same, rules: rules });
+      if (!same && !res.first) { res.first = "string to sign, " + p[0]; }
+    });
+    if (SA.sigv4a || SM.sigv4a) { res.notes.push("SigV4a (AWS4-ECDSA-P256-SHA256) detected. Its credential scope rule differs and is not checked here; the hash check is skipped."); }
+  }
+  function row(part, a, m, rules) { var r = { part: part, a: a, m: m, same: a === m, rules: rules || [] }; if (!r.same && !r.rules.length) { r.rules.push({ k: "none", t: "differs; no catalogued rule matched" }); } if (!r.same && !res.first) { res.first = part; } res.rows.push(r); return r; }
+  row("HTTPMethod", PA.method, PM.method);
+  row("CanonicalURI", PA.uri, PM.uri, PA.uri === PM.uri ? [] : pathRules(PA.uri, PM.uri, svc));
+  row("CanonicalQueryString", PA.query, PM.query, PA.query === PM.query ? [] : queryRules(PA.query, PM.query));
+  /* headers aligned by name */
+  var names = [];
+  PA.headers.concat(PM.headers).forEach(function (h) { if (names.indexOf(h.lname) < 0) { names.push(h.lname); } });
+  names.sort(cmpBytes);
+  var sigA = PA.signed.toLowerCase().split(";"), sigM = PM.signed.toLowerCase().split(";");
+  names.forEach(function (n) {
+    var allA = PA.headers.filter(function (h) { return h.lname === n; }), allM = PM.headers.filter(function (h) { return h.lname === n; });
+    var ha = allA[0], hm = allM[0];
+    /* every line for this name is shown, so a repeated header line is never hidden */
+    var a = ha ? allA.map(function (h) { return h.raw; }).join("\n") : "(absent)", m = hm ? allM.map(function (h) { return h.raw; }).join("\n") : "(absent)", rules = [];
+    if (ha && hm && a !== m && (allA.length > 1 || allM.length > 1)) {
+      rules.push({ k: "K8", t: "The header " + n + " is on " + allM.length + " line" + (allM.length === 1 ? "" : "s") + " on your side and " + allA.length + " on the AWS side. A multi-value header is one canonical line: separate the values for a multi-value header using commas." });
+    } else if (ha && hm && ha.raw !== hm.raw) {
+      if (ha.name !== hm.name && ha.lname === hm.lname) { rules.push({ k: "K6", t: "The header name is written " + (hm.name !== hm.lname ? "with uppercase on your side" : "with uppercase on the AWS side") + "; canonical header names are lowercase." }); }
+      if (ha.value !== hm.value) { rules = rules.concat(headerValueRules(n, ha.value, hm.value, sigA, sigM)); }
+    } else if (!ha || !hm) {
+      rules.push({ k: "K9", t: n + " is in " + (ha ? "AWS's" : "your") + " canonical headers only. Both sides must sign the same set of headers" + (hm && sigM.indexOf(n) >= 0 && !ha ? "; a header you signed may not have reached AWS, which is what a proxy that strips it would cause." : ".") });
+    }
+    row("header " + n, a, m, rules);
+  });
+  row("SignedHeaders", PA.signed, PM.signed, PA.signed === PM.signed ? [] : (PA.signed.toLowerCase() === PM.signed.toLowerCase() ? [{ k: "K6", t: "SignedHeaders differs only in case; names are lowercase." }] : [{ k: "K9", t: "The two sides signed different header sets." }]));
+  var pr = [];
+  if (PA.payload !== PM.payload) {
+    if ((PA.payload === EMPTY) !== (PM.payload === EMPTY)) { pr.push({ k: "K11", t: (PM.payload === EMPTY ? "Your side" : "The AWS side") + " signed an empty body: " + EMPTY + " is the SHA-256 of the empty string. The other side hashed a payload." }); }
+    if (PA.payload === "UNSIGNED-PAYLOAD" || PM.payload === "UNSIGNED-PAYLOAD") { pr.push({ k: "K11", t: "One side uses the literal UNSIGNED-PAYLOAD. For S3 the IAM page says to put that literal in the canonical request and send the same value as x-amz-content-sha256." }); }
+  }
+  row("HashedPayload", PA.payload, PM.payload, pr);
+  res.sideA = sideChecks(PA, "AWS side", svc);
+  res.sideM = sideChecks(PM, "Your side", svc);
+  return res;
+}
+function hex(buf) { var b = new Uint8Array(buf), s = ""; for (var i = 0; i < b.length; i++) { s += (b[i] < 16 ? "0" : "") + b[i].toString(16); } return s; }
+function sha256(text) {
+  if (!(window.crypto && window.crypto.subtle)) { return Promise.reject(new Error("WebCrypto is not available in this context")); }
+  return window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)).then(hex);
+}
+function hashChecks(res) {
+  /* resolves to K16 rows for each side that has a string to sign */
+  var jobs = [];
+  [["AWS side", res.A, res.SA], ["Your side", res.M, res.SM]].forEach(function (s) {
+    if (!s[1] || !s[2] || s[2].sigv4a) { return; }
+    jobs.push(sha256(s[1].cr).then(function (h) {
+      var ok = h === s[2].hash.toLowerCase();
+      return { side: s[0], computed: h, stated: s[2].hash, ok: ok, t: ok ? s[0] + ": the string to sign's hash matches SHA-256 of its canonical request." : (s[0] === "Your side" ? "Your side: the last line of your string to sign is not SHA-256 of the canonical request you pasted, so your signer hashed something other than what you pasted." : "AWS side: the hash in AWS's string to sign does not match its canonical request as pasted; the paste was probably altered (entity decoding, whitespace or truncation).") };
+    }, function (e) { return { side: s[0], error: e.message }; }));
+  });
+  return Promise.all(jobs);
+}
+function rulesNamed(res) {
+  var s = {};
+  res.rows.concat(res.stsRows).forEach(function (r) { r.rules.forEach(function (x) { s[x.k] = true; }); });
+  (res.sideA || []).concat(res.sideM || []).forEach(function (x) { s[x.k] = true; });
+  return s;
+}
+return { diff: diff, hashChecks: hashChecks, sha256: sha256, rulesNamed: rulesNamed, EMPTY: EMPTY, splitCanonical: splitCanonical, parseAws: parseAws };
+})();
+/* ENGINE END */
+
+/* ---------- rendering (DOM only, never innerHTML with input) ---------- */
+function el(tag, attrs) {
+  var e = document.createElement(tag);
+  if (attrs) { Object.keys(attrs).forEach(function (k) { if (k === "text") { e.textContent = attrs[k]; } else if (k === "cls") { e.className = attrs[k]; } else { e.setAttribute(k, attrs[k]); } }); }
+  for (var i = 2; i < arguments.length; i++) { var c = arguments[i]; if (c === null || c === undefined) { continue; } e.appendChild(typeof c === "string" ? document.createTextNode(c) : c); }
+  return e;
+}
+function tag(text, cls) { return el("span", { cls: "tag " + cls, text: text }); }
+function side(label, text) { return el("div", { cls: "side" }, el("span", { cls: "lab", text: label }), el("pre", { tabindex: "0", text: text === "" ? "(empty line)" : text })); }
+function drow(r) {
+  var d = el("div", { cls: "drow" + (r.same ? "" : " bad") });
+  d.appendChild(el("div", { cls: "part" }, r.part, el("br"), r.same ? tag("same", "t-ok") : tag("DIFFERS", "t-err")));
+  d.appendChild(side("AWS said", r.a));
+  d.appendChild(side("Your code built", r.m));
+  if (!r.same) {
+    var rl = el("div", { cls: "rules" });
+    r.rules.forEach(function (x) { rl.appendChild(el("p", {}, x.k === "none" || x.k === "scope" ? null : tag(x.k, "t-warn"), x.t)); });
+    d.appendChild(rl);
+  }
+  return d;
+}
+var IN = { aws: document.getElementById("in-aws"), mine: document.getElementById("in-mine"), svc: document.getElementById("in-service") };
+var runId = 0;
+function run() {
+  var my = ++runId;
+  var out = document.getElementById("out");
+  out.textContent = "";
+  var R = ENGINE.diff(IN.aws.value, IN.mine.value, IN.svc.value);
+  if (R.errors.length) { R.errors.forEach(function (e) { out.appendChild(el("div", { cls: "err-box", role: "alert", text: e })); }); return; }
+  var diffs = R.rows.concat(R.stsRows).filter(function (r) { return !r.same; }).length;
+  out.appendChild(el("div", { cls: "summary " + (diffs ? "fail" : "pass") }, el("strong", { text: diffs ? "First difference: " + R.first + "." : "The canonical requests" + (R.SA && R.SM ? " and strings to sign" : "") + " are identical." }), " " + diffs + (diffs === 1 ? " part differs." : " parts differ.")));
+  if (R.notes.length) { var ul = el("ul", { cls: "tight note" }); R.notes.forEach(function (n) { ul.appendChild(el("li", { text: n })); }); out.appendChild(ul); }
+  if (R.stsRows.length) {
+    out.appendChild(el("h3", { text: "String to sign (checked first)" }));
+    var sd = el("div", { cls: "diff" }); R.stsRows.forEach(function (r) { sd.appendChild(drow(r)); }); out.appendChild(sd);
+  } else {
+    out.appendChild(el("p", { cls: "note", text: "No string to sign on " + (R.SA ? "your side" : R.SM ? "the AWS side" : "either side") + ", so the scope, date and hash checks need both." }));
+  }
+  var hashHost = el("div", { cls: "diff" });
+  out.appendChild(el("h3", { text: "Hash check (K16)" }));
+  out.appendChild(hashHost);
+  hashHost.appendChild(el("div", { cls: "drow" }, el("div", { cls: "part", text: "status" }), el("div", { cls: "side", text: "Computing SHA-256 with WebCrypto..." })));
+  ENGINE.hashChecks(R).then(function (hs) {
+    if (my !== runId) { return; }
+    hashHost.textContent = "";
+    if (!hs.length) { hashHost.appendChild(el("div", { cls: "drow" }, el("div", { cls: "part", text: "K16" }), el("div", { cls: "side", text: "Needs a string to sign on a side (SigV4a is skipped)." }))); return; }
+    hs.forEach(function (h) {
+      if (h.error) { hashHost.appendChild(el("div", { cls: "drow warnrow" }, el("div", { cls: "part", text: h.side }), el("div", { cls: "side", text: "Hash check unavailable: " + h.error }))); return; }
+      var d = el("div", { cls: "drow" + (h.ok ? "" : " bad") }, el("div", { cls: "part" }, h.side, el("br"), h.ok ? tag("matches", "t-ok") : tag("MISMATCH", "t-err")), side("SHA-256 of the canonical request", h.computed), side("last line of the string to sign", h.stated));
+      if (!h.ok) { d.appendChild(el("div", { cls: "rules" }, el("p", {}, tag("K16", "t-warn"), h.t))); }
+      hashHost.appendChild(d);
+    });
+  });
+  out.appendChild(el("h3", { text: "Canonical request" }));
+  var cd = el("div", { cls: "diff" }); R.rows.forEach(function (r) { cd.appendChild(drow(r)); }); out.appendChild(cd);
+  var sc = R.sideA.concat(R.sideM);
+  if (sc.length) {
+    out.appendChild(el("h3", { text: "Checks on each side by itself" }));
+    var ul2 = el("ul", { cls: "tight" }); sc.forEach(function (x) { ul2.appendChild(el("li", {}, tag(x.k, x.warn ? "t-warn" : "t-err"), x.t)); }); out.appendChild(ul2);
+  }
+}
+
+/* ---------- presets (own values; hashes computed live) ---------- */
+var E = ENGINE.EMPTY;
+function cr(method, uri, query, headers, payload) { return [method, uri, query].concat(headers).concat(["", headers.map(function (h) { return h.slice(0, h.indexOf(":")).toLowerCase(); }).join(";"), payload]).join("\n"); }
+function xmlEsc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+var SCOPE_S3 = "20261001/us-east-1/s3/aws4_request", DT = "20261001T120000Z";
+function s3h(extra) { return ["host:amzn-s3-demo-bucket.s3.amazonaws.com", "x-amz-content-sha256:" + E, "x-amz-date:" + DT].concat(extra || []).sort(); }
+var PRESETS = [
+  { id: "P1", label: "P1 path encoded twice", svc: "s3", aws: cr("GET", "/photos/my%20file%2Bv1.txt", "", s3h(), E), mine: cr("GET", "/photos/my%2520file%252Bv1.txt", "", s3h(), E), expect: "K12" },
+  { id: "P2", label: "P2 + for space", svc: "s3", aws: cr("GET", "/", "prefix=my%20notes", s3h(), E), mine: cr("GET", "/", "prefix=my+notes", s3h(), E), expect: "K1" },
+  { id: "P3", label: "P3 lowercase hex", svc: "s3", aws: cr("GET", "/", "prefix=caf%C3%A9", s3h(), E), mine: cr("GET", "/", "prefix=caf%c3%a9", s3h(), E), expect: "K2" },
+  { id: "P4", label: "P4 unsorted query", svc: "s3", aws: cr("GET", "/", "max-keys=2&prefix=x", s3h(), E), mine: cr("GET", "/", "prefix=x&max-keys=2", s3h(), E), expect: "K4" },
+  { id: "P5", label: "P5 multi-value header", svc: "s3", aws: cr("PUT", "/report.csv", "", s3h(["x-amz-meta-tag:a,b"]), E), mine: cr("PUT", "/report.csv", "", s3h(["x-amz-meta-tag:a b"]), E), expect: "K8" },
+  { id: "P6", label: "P6 header arrived empty", svc: "s3", aws: cr("PUT", "/upload.bin", "", s3h(["content-length:"]), E), mine: cr("PUT", "/upload.bin", "", s3h(["content-length:17"]), E), expect: "K10" },
+  { id: "P7", label: "P7 empty body hash", svc: "s3", aws: cr("PUT", "/note.txt", "", ["host:amzn-s3-demo-bucket.s3.amazonaws.com", "x-amz-content-sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "x-amz-date:" + DT], "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"), mine: cr("PUT", "/note.txt", "", ["host:amzn-s3-demo-bucket.s3.amazonaws.com", "x-amz-content-sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "x-amz-date:" + DT], E), expect: "K11" },
+  { id: "P8", label: "P8 Query API message", svc: "other", awsKind: "message", aws: cr("GET", "/", "Action=ListUsers&Version=2010-05-08", ["host:iam.amazonaws.com", "x-amz-date:" + DT], E), mine: cr("GET", "/", "Version=2010-05-08&Action=ListUsers", ["host:iam.amazonaws.com", "x-amz-date:" + DT], E), scope: "20261001/us-east-1/iam/aws4_request", expect: "K4" }
+];
+function sts(scope, hash) { return ["AWS4-HMAC-SHA256", DT, scope, hash].join("\n"); }
+function buildPreset(p) {
+  var scope = p.scope || SCOPE_S3;
+  return Promise.all([ENGINE.sha256(p.aws), ENGINE.sha256(p.mine)]).then(function (h) {
+    var awsText;
+    if (p.awsKind === "message") {
+      awsText = "<ErrorResponse>\n  <Error>\n    <Type>Sender</Type>\n    <Code>SignatureDoesNotMatch</Code>\n    <Message>The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details.\n\nThe canonical string for this request should have been\n'" + xmlEsc(p.aws) + "'\n\nThe String-to-Sign should have been\n'" + sts(scope, h[0]) + "'\n</Message>\n  </Error>\n</ErrorResponse>";
+    } else {
+      awsText = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Error><Code>SignatureDoesNotMatch</Code><Message>The request signature we calculated does not match the signature you provided. Check your key and signing method.</Message><StringToSign>" + sts(scope, h[0]) + "</StringToSign><CanonicalRequest>" + xmlEsc(p.aws) + "</CanonicalRequest></Error>";
+    }
+    return { aws: awsText, mine: p.mine + "\n\n" + sts(scope, h[1]), svc: p.svc };
+  });
+}
+
+/* ---------- self test ---------- */
+function seeded(seed) { var s = seed >>> 0; return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+function uriEncode(str, keepSlash) {
+  var bytes = new TextEncoder().encode(str), out = "";
+  for (var i = 0; i < bytes.length; i++) {
+    var c = bytes[i], ch = String.fromCharCode(c);
+    if (/[A-Za-z0-9\-._~]/.test(ch) || (keepSlash && ch === "/")) { out += ch; } else { out += "%" + (c < 16 ? "0" : "") + c.toString(16).toUpperCase(); }
+  }
+  return out;
+}
+function genRequest(rnd) {
+  var pick = function (a) { return a[Math.floor(rnd() * a.length)]; };
+  var words = ["photos", "my file", "a+b", "café", "x~y", "report 2026", "naïve"];
+  var path = "/" + [pick(words), pick(words)].join("/");
+  var vals = ["my notes", "café au lait", "a b c", "x+y z"];
+  var params = [{ k: "prefix", v: pick(vals) }, { k: "max-keys", v: String(1 + Math.floor(rnd() * 50)) }, { k: "acl", v: "" }, { k: "list-type", v: "2" }];
+  var q = params.map(function (p) { return { k: uriEncode(p.k), v: uriEncode(p.v) }; }).sort(function (a, b) { return a.k < b.k ? -1 : a.k > b.k ? 1 : 0; });
+  var headers = [["host", "amzn-s3-demo-bucket.s3.amazonaws.com"], ["x-amz-content-sha256", rnd() < 0.5 ? E : "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"], ["x-amz-date", DT], ["x-amz-meta-tag", "a,b"], ["content-length", String(10 + Math.floor(rnd() * 90))], ["x-amz-meta-note", "alpha beta"]].sort(function (a, b) { return a[0] < b[0] ? -1 : 1; });
+  return { method: pick(["GET", "PUT"]), path: uriEncode(path, true), q: q, headers: headers, payload: headers.filter(function (h) { return h[0] === "x-amz-content-sha256"; })[0][1] };
+}
+function render(r) {
+  return [r.method, r.path, r.q.map(function (p) { return p.k + (p.noEq ? "" : "=") + p.v; }).join("&")].concat(r.headers.map(function (h) { return h[0] + ":" + h[1]; })).concat(["", r.headers.map(function (h) { return h[0].toLowerCase(); }).join(";"), r.payload]).join("\n");
+}
+var MUTATIONS = {
+  K1: function (r) { r.q.forEach(function (p) { if (/%20/.test(p.v) && !r._d) { p.v = p.v.replace("%20", "+"); r._d = 1; } }); return r._d; },
+  K2: function (r) { var done = false; r.q.forEach(function (p) { if (!done && /%[0-9][A-F]|%[A-F]/.test(p.v)) { p.v = p.v.replace(/%([0-9A-F]*[A-F][0-9A-F]*)/, function (m, h) { return "%" + h.toLowerCase(); }); done = true; } }); if (!done && /%[0-9][A-F]|%[A-F]/.test(r.path)) { r.path = r.path.replace(/%([0-9]?[A-F][0-9A-F]?)/, function (m, h) { return "%" + h.toLowerCase(); }); done = true; } return done; },
+  K4: function (r) { if (r.q.length < 2) { return false; } var t = r.q[0]; r.q[0] = r.q[1]; r.q[1] = t; return true; },
+  K5: function (r) { var p = r.q.filter(function (x) { return x.v === ""; })[0]; if (!p) { return false; } p.noEq = true; return true; },
+  K6: function (r) { r.headers[1] = [r.headers[1][0].replace(/^./, function (c) { return c.toUpperCase(); }).replace(/-(.)/g, function (m, c) { return "-" + c.toUpperCase(); }), r.headers[1][1]]; return true; },
+  K7: function (r) { var h = r.headers.filter(function (x) { return x[0] === "x-amz-meta-note"; })[0]; h[1] = h[1].replace(" ", "   "); return true; },
+  K8: function (r) { var h = r.headers.filter(function (x) { return x[0] === "x-amz-meta-tag"; })[0]; h[1] = "a b"; return true; },
+  K10: function (r) { var h = r.headers.filter(function (x) { return x[0] === "content-length"; })[0]; h[1] = ""; return true; },
+  K11: function (r) { r.payload = r.payload === E ? "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08" : E; return true; },
+  K12: function (r) { if (!/%/.test(r.path)) { return false; } r.path = r.path.replace(/%/g, "%25"); return true; },
+  K13: function (r) { var i = r.path.indexOf("/", 1); if (i < 0) { return false; } r.path = r.path.slice(0, i) + "%2F" + r.path.slice(i + 1); return true; }
+};
+function fuzz(n) {
+  var rnd = seeded(20261002), ok = 0, tried = 0, bad = null, keys = Object.keys(MUTATIONS);
+  for (var i = 0; i < n; i++) {
+    var k = keys[i % keys.length], base0 = genRequest(rnd), a = render(base0);
+    var mut = JSON.parse(JSON.stringify(base0));
+    if (!MUTATIONS[k](mut)) { continue; }
+    tried++;
+    var m = render(mut);
+    if (k === "K10") { var t = a; a = m; m = t; }
+    var res = ENGINE.diff(a, m, "s3"), named = ENGINE.rulesNamed(res);
+    if (named[k]) { ok++; } else if (!bad) { bad = k + " not named; got " + Object.keys(named).join(",") + " for " + JSON.stringify(m.split("\n").slice(0, 3)); }
+  }
+  return { ok: ok, n: tried, bad: bad };
+}
+function fx(name, aws, mine, svc, expectRule) { return { name: name, aws: aws, mine: mine, svc: svc || "s3", rule: expectRule }; }
+var H3 = ["host:amzn-s3-demo-bucket.s3.amazonaws.com", "x-amz-content-sha256:" + E, "x-amz-date:" + DT];
+var FIXTURES = [
+  fx("K1: + for a space in the query", cr("GET", "/", "prefix=a%20b", H3, E), cr("GET", "/", "prefix=a+b", H3, E), "s3", "K1"),
+  fx("K2: lowercase hex in the path", cr("GET", "/caf%C3%A9", "", H3, E), cr("GET", "/caf%c3%a9", "", H3, E), "s3", "K2"),
+  fx("K3: an unreserved tilde was encoded", cr("GET", "/a~b", "", H3, E), cr("GET", "/a%7Eb", "", H3, E), "s3", "K3"),
+  fx("K4: query keys unsorted", cr("GET", "/", "a=1&b=2", H3, E), cr("GET", "/", "b=2&a=1", H3, E), "s3", "K4"),
+  fx("K5: valueless parameter without =", cr("GET", "/", "acl=", H3, E), cr("GET", "/", "acl", H3, E), "s3", "K5"),
+  fx("K6: header name not lowercase", cr("GET", "/", "", H3, E), cr("GET", "/", "", ["Host:amzn-s3-demo-bucket.s3.amazonaws.com", "x-amz-content-sha256:" + E, "x-amz-date:" + DT], E), "s3", "K6"),
+  fx("K7: header value not trimmed", cr("GET", "/", "", H3.concat(["x-amz-meta-note:alpha beta"]).sort(), E), cr("GET", "/", "", H3.concat(["x-amz-meta-note:  alpha   beta "]).sort(), E), "s3", "K7"),
+  fx("K8: multi-value header joined with a space", cr("GET", "/", "", H3.concat(["x-amz-meta-tag:a,b"]).sort(), E), cr("GET", "/", "", H3.concat(["x-amz-meta-tag:a b"]).sort(), E), "s3", "K8"),
+  fx("K9: a header signed on one side only", cr("GET", "/", "", H3, E), cr("GET", "/", "", H3.concat(["x-amz-security-token:abc"]).sort(), E), "s3", "K9"),
+  fx("K10: header arrived empty", cr("PUT", "/", "", ["content-length:"].concat(H3), E), cr("PUT", "/", "", ["content-length:17"].concat(H3), E), "s3", "K10"),
+  fx("K11: one side signed an empty body", cr("PUT", "/", "", H3, "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"), cr("PUT", "/", "", H3, E), "s3", "K11"),
+  fx("K11: UNSIGNED-PAYLOAD on one side", cr("PUT", "/", "", H3, "UNSIGNED-PAYLOAD"), cr("PUT", "/", "", H3, E), "s3", "K11"),
+  fx("K12: path encoded twice for S3", cr("GET", "/my%20file", "", H3, E), cr("GET", "/my%2520file", "", H3, E), "s3", "K12"),
+  fx("K12: path normalized on one side", cr("GET", "/a//b/./c", "", H3, E), cr("GET", "/a/b/c", "", H3, E), "s3", "K12"),
+  fx("K13: slash encoded as %2F", cr("GET", "/a/b", "", H3, E), cr("GET", "/a%2Fb", "", H3, E), "s3", "K13"),
+  fx("K14: user-agent signed (warning)", cr("GET", "/", "", H3.concat(["user-agent:x"]).sort(), E), cr("GET", "/", "", H3.concat(["user-agent:x"]).sort(), E), "s3", "K14"),
+  fx("K15: host not signed", cr("GET", "/", "", ["x-amz-content-sha256:" + E, "x-amz-date:" + DT], E), cr("GET", "/", "", ["x-amz-content-sha256:" + E, "x-amz-date:" + DT], E), "s3", "K15"),
+  fx("presigned: X-Amz-Signature inside the canonical query", cr("GET", "/", "X-Amz-Date=" + DT, ["host:amzn-s3-demo-bucket.s3.amazonaws.com"], "UNSIGNED-PAYLOAD"), cr("GET", "/", "X-Amz-Date=" + DT + "&X-Amz-Signature=00", ["host:amzn-s3-demo-bucket.s3.amazonaws.com"], "UNSIGNED-PAYLOAD"), "s3", "presigned"),
+  fx("unmatched difference is never guessed", cr("GET", "/a", "", H3, E), cr("GET", "/b", "", H3, E), "s3", "none"),
+  fx("scope mismatch is reported first", cr("GET", "/", "", H3, E) + "\n\nAWS4-HMAC-SHA256\n" + DT + "\n20261001/us-east-1/s3/aws4_request\n" + "0".repeat(64), cr("GET", "/", "", H3, E) + "\n\nAWS4-HMAC-SHA256\n" + DT + "\n20261001/eu-west-1/s3/aws4_request\n" + "0".repeat(64), "s3", "scope")
+];
+function runSelfTest() {
+  var host = document.getElementById("self"), sum = document.getElementById("self-summary");
+  host.textContent = ""; sum.textContent = "Running..."; sum.removeAttribute("data-fail");
+  var rows = [];
+  function add(name, ok, got) { rows.push({ name: name, ok: ok, got: got }); }
+  FIXTURES.forEach(function (f) {
+    try {
+      var res = ENGINE.diff(f.aws, f.mine, f.svc), named = ENGINE.rulesNamed(res);
+      var ok = !!named[f.rule];
+      if (f.rule === "scope") { ok = ok && /string to sign/.test(res.first || ""); }
+      add(f.name, ok, "named " + (Object.keys(named).join(", ") || "nothing") + (res.first ? "; first difference " + res.first : ""));
+    } catch (ex) { add(f.name, false, "threw " + ex.message); }
+  });
+  try {
+    var crQ = cr("GET", "/", "Action=ListUsers", ["host:iam.amazonaws.com", "x-amz-date:" + DT, "x-amz-meta-note:it's here"], E);
+    var msgQ = "<Message>The canonical string for this request should have been\n'" + crQ + "'\n\nThe String-to-Sign should have been\n'AWS4-HMAC-SHA256\n" + DT + "\n20261001/us-east-1/iam/aws4_request\n" + "0".repeat(64) + "'\n</Message>";
+    var pq = ENGINE.parseAws(msgQ);
+    add("parse: a ' inside the canonical request of a \"should have been\" message is kept", pq.cr === crQ && !!pq.sts, pq.cr === crQ ? "canonical request read whole" : "read as " + JSON.stringify(String(pq.cr).slice(-40)));
+  } catch (ex) { add("parse: a ' inside a \"should have been\" message", false, "threw " + ex.message); }
+  try {
+    var rd = ENGINE.diff(cr("GET", "/", "", H3.concat(["x-amz-meta-a:1,2"]).sort(), E), cr("GET", "/", "", H3.concat(["x-amz-meta-a:1", "x-amz-meta-a:2"]).sort(), E), "s3");
+    var rdRow = rd.rows.filter(function (r) { return r.part === "header x-amz-meta-a"; })[0];
+    add("K8: a header repeated on two lines is shown whole and named", !!ENGINE.rulesNamed(rd).K8 && !!rdRow && rdRow.m.split("\n").length === 2, "named " + Object.keys(ENGINE.rulesNamed(rd)).join(", "));
+  } catch (ex) { add("K8: a header repeated on two lines", false, "threw " + ex.message); }
+  var fz; try { fz = fuzz(1100); } catch (ex) { fz = { ok: 0, n: 1, bad: "threw " + ex.message }; }
+  add("fuzz: seeded random canonical requests, one catalogued mutation each", fz.ok === fz.n && fz.n >= 1000, fz.ok + " of " + fz.n + " mutations named correctly" + (fz.bad ? "; first miss: " + fz.bad : ""));
+  var jobs = [];
+  jobs.push(ENGINE.sha256("").then(function (h) { add("K16 constant: SHA-256 of the empty string, recomputed with WebCrypto", h === E, h); }, function (e) { add("K16 constant: SHA-256 of the empty string", false, e.message); }));
+  jobs.push(ENGINE.sha256(cr("GET", "/", "", H3, E)).then(function (h) {
+    var good = cr("GET", "/", "", H3, E) + "\n\nAWS4-HMAC-SHA256\n" + DT + "\n" + SCOPE_S3 + "\n" + h;
+    var badTxt = cr("GET", "/", "", H3, E) + "\n\nAWS4-HMAC-SHA256\n" + DT + "\n" + SCOPE_S3 + "\n" + "1".repeat(64);
+    return ENGINE.hashChecks(ENGINE.diff(good, badTxt, "s3")).then(function (hs) {
+      var a = hs.filter(function (x) { return x.side === "AWS side"; })[0], m = hs.filter(function (x) { return x.side === "Your side"; })[0];
+      add("K16: a wrong hash on your side is caught, a right one passes", a && a.ok && m && !m.ok, "AWS side " + (a && a.ok ? "matches" : "mismatch") + ", your side " + (m && m.ok ? "matches" : "mismatch"));
+    });
+  }, function (e) { add("K16 check", false, e.message); }));
+  PRESETS.forEach(function (p) {
+    jobs.push(buildPreset(p).then(function (b) {
+      var res = ENGINE.diff(b.aws, b.mine, b.svc), named = ENGINE.rulesNamed(res);
+      return ENGINE.hashChecks(res).then(function (hs) {
+        var hashOk = hs.length === 2 && hs.every(function (h) { return h.ok; });
+        add("preset " + p.label, !!named[p.expect] && hashOk, "named " + Object.keys(named).join(", ") + "; hash checks " + (hashOk ? "both match" : "FAILED"));
+      });
+    }, function (e) { add("preset " + p.label, false, e.message); }));
+  });
+  var control = fx("positive control: asserts P2 (+ for space) names K12 (it must not)", cr("GET", "/", "prefix=a%20b", H3, E), cr("GET", "/", "prefix=a+b", H3, E), "s3", "K12");
+  var cn = ENGINE.rulesNamed(ENGINE.diff(control.aws, control.mine, control.svc)), controlFine = !cn.K12;
+  Promise.all(jobs).then(function () {
+    var t = el("table"); t.appendChild(el("caption", { text: "Self test results" }));
+    t.appendChild(el("thead", {}, el("tr", {}, el("th", { scope: "col", text: "Case" }), el("th", { scope: "col", text: "Expected" }), el("th", { scope: "col", text: "Result" }))));
+    var tb = el("tbody"), pass = 0, failN = 0;
+    rows.forEach(function (r) { if (r.ok) { pass++; } else { failN++; } tb.appendChild(el("tr", {}, el("td", { text: r.name }), el("td", { text: "the named rule appears" }), el("td", {}, el("span", { cls: r.ok ? "t-ok" : "t-err", text: (r.ok ? "PASS: " : "FAIL: ") + r.got })))); });
+    tb.appendChild(el("tr", {}, el("td", { text: control.name }), el("td", { text: "this assertion must fail" }), el("td", {}, el("span", { cls: controlFine ? "t-ok" : "t-err", text: controlFine ? "Control failed as designed: K12 was not named." : "Control held. The suite is not trustworthy." }))));
+    t.appendChild(tb); host.appendChild(t);
+    sum.textContent = pass + " of " + rows.length + " checks pass, " + failN + " fail. Positive control " + (controlFine ? "failed as designed." : "did NOT fail, so these results cannot be trusted.");
+    sum.className = failN === 0 && controlFine ? "t-ok" : "t-err";
+    sum.setAttribute("data-pass", String(pass)); sum.setAttribute("data-fail", String(failN)); sum.setAttribute("data-control", controlFine ? "ok" : "held");
+  });
+}
+
+/* ---------- theme toggle ---------- */
+var themeBtn = document.getElementById("theme-toggle");
+function effectiveTheme() {
+  var a = document.documentElement.getAttribute("data-theme");
+  if (a === "dark" || a === "light") { return a; }
+  return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+function setTheme(t) {
+  document.documentElement.setAttribute("data-theme", t);
+  themeBtn.textContent = t === "dark" ? "Light" : "Dark";
+  themeBtn.setAttribute("aria-label", t === "dark" ? "Switch to light theme" : "Switch to dark theme");
+}
+(function () {
+  var KEY = "theme";
+  setTheme(effectiveTheme());
+  themeBtn.addEventListener("click", function () {
+    var next = effectiveTheme() === "dark" ? "light" : "dark";
+    setTheme(next);
+    try { localStorage.setItem(KEY, next); } catch (e) {}
+  });
+})();
+
+/* ---------- wire up ---------- */
+var exHost = document.getElementById("examples");
+function load(p) { return buildPreset(p).then(function (b) { IN.aws.value = b.aws; IN.mine.value = b.mine; IN.svc.value = b.svc; run(); }); }
+PRESETS.forEach(function (p) {
+  var b = el("button", { type: "button", text: p.label });
+  b.addEventListener("click", function () { load(p).catch(function (e) { document.getElementById("out").textContent = "Could not build the example: " + e.message; }); });
+  exHost.appendChild(b);
+});
+var timer = null;
+[IN.aws, IN.mine].forEach(function (n) { n.addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(run, 250); }); });
+IN.svc.addEventListener("change", run);
+document.getElementById("btn-run").addEventListener("click", run);
+document.getElementById("btn-self").addEventListener("click", runSelfTest);
+load(PRESETS[0]).catch(function (e) { IN.aws.value = PRESETS[0].aws; IN.mine.value = PRESETS[0].mine; run(); });
+runSelfTest();
+})();
+</script>
+</body>
+</html>
