@@ -104,7 +104,7 @@ This is an independent tool. It is not affiliated with or endorsed by Amazon Web
 
 - https://github.com/0xelitesystem/http-message-signature-base-builder
 - https://github.com/0xelitesystem/webhook-signature-verifier
-- https://github.com/0xelitesystem/iam-policy-analyzer
+- https://github.com/0xelitesystem/iam-policy-risk-flagger
 
 ## License
 
